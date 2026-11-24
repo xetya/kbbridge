@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="svc_desc">Meneruskan ketikan keyboard eksternal ke laptop lewat Wi-Fi. Hanya aktif saat tombol Connect ditekan. Tidak membaca isi layar.</string>
+</resources>
