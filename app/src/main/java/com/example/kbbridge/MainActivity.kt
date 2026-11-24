@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -18,11 +19,29 @@ class MainActivity : Activity() {
     @Volatile private var out: PrintWriter? = null
     private var sock: Socket? = null
     private lateinit var status: TextView
+    private lateinit var ipField: EditText
+
+    private fun lockInputToBridge() {
+        ipField.clearFocus()
+        ipField.isFocusable = false
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(ipField.windowToken, 0)
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM,
+            WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
+        )
+    }
+
+    private fun unlockInput() {
+        window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+        ipField.isFocusable = true
+        ipField.isFocusableInTouchMode = true
+    }
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         val prefs = getSharedPreferences("kb", MODE_PRIVATE)
-        val ip = EditText(this).apply {
+        ipField = EditText(this).apply {
             hint = "IP laptop, mis. 192.168.43.5"
             setText(prefs.getString("ip", ""))
         }
@@ -31,14 +50,15 @@ class MainActivity : Activity() {
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(40, 80, 40, 40)
-            addView(ip); addView(btn); addView(status)
+            addView(ipField); addView(btn); addView(status)
         })
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         btn.setOnClickListener {
-            val addr = ip.text.toString().trim()
+            val addr = ipField.text.toString().trim()
             prefs.edit().putString("ip", addr).apply()
             status.text = "Menghubungkan..."
+            unlockInput()
             ex.execute {
                 try {
                     try { sock?.close() } catch (_: Exception) {}
@@ -48,7 +68,10 @@ class MainActivity : Activity() {
                     s.connect(InetSocketAddress(addr, 5005), 3000)
                     sock = s
                     out = PrintWriter(s.getOutputStream(), true)
-                    runOnUiThread { status.text = "Terhubung. Ketik di keyboard." }
+                    runOnUiThread {
+                        status.text = "Terhubung. Ketik di keyboard."
+                        lockInputToBridge()
+                    }
                 } catch (e: Exception) {
                     runOnUiThread { status.text = "Gagal: ${e.message}" }
                 }
@@ -72,7 +95,10 @@ class MainActivity : Activity() {
                 o.println("$act:$name")
                 if (o.checkError()) {
                     out = null
-                    runOnUiThread { status.text = "Koneksi putus. Tekan Connect lagi." }
+                    runOnUiThread {
+                        status.text = "Koneksi putus. Tekan Connect lagi."
+                        unlockInput()
+                    }
                 }
             } catch (_: Exception) {}
         }
